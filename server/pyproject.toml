@@ -1,0 +1,16 @@
+[project]
+name = "esp32-translation-audio"
+version = "0.1.0"
+description = "ESP32-S3 Audio Streamer & Whisper Transcription Server"
+requires-python = ">=3.11, <3.13"
+dependencies = [
+    "fastapi>=0.100.0",
+    "uvicorn[standard]>=0.23.0",
+    "websockets>=11.0",
+    "faster-whisper>=1.0.0",
+    "onnxruntime<1.24.0",
+    "numpy>=1.24.0",
+    "scipy>=1.10.0",
+    "sherpa-onnx>=1.13.7",
+    "sherpa-onnx-core>=1.13.7",
+]

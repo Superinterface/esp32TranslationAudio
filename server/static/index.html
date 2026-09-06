@@ -1,0 +1,1199 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ESP32-S3 实时音频监听与流式 Whisper 纪要中心</title>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=PingFang+SC:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #0b0f19;
+            --card-bg: #151d2e;
+            --card-border: #23314d;
+            --accent-color: #38bdf8;
+            --accent-glow: rgba(56, 189, 248, 0.25);
+            --success-color: #10b981;
+            --danger-color: #ef4444;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            font-family: 'PingFang SC', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            padding: 24px;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid var(--card-border);
+            flex-wrap: wrap;
+            gap: 16px;
+        }
+
+        .title-group h1 {
+            font-size: 22px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .title-group p {
+            color: var(--text-muted);
+            font-size: 13px;
+            margin-top: 4px;
+        }
+
+        .status-badges {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
+
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 14px;
+            border-radius: 9999px;
+            font-size: 12px;
+            font-weight: 500;
+            background: #090d16;
+            border: 1px solid var(--card-border);
+        }
+
+        .badge-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background-color: var(--text-muted);
+        }
+
+        .badge-online .badge-dot {
+            background-color: var(--success-color);
+            box-shadow: 0 0 8px var(--success-color);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.5; transform: scale(0.85); }
+            100% { opacity: 1; transform: scale(1); }
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+            margin-bottom: 24px;
+        }
+
+        @media (max-width: 850px) {
+            .grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .card {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+
+        .card-header h2 {
+            font-size: 16px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        canvas#visualizer {
+            width: 100%;
+            height: 140px;
+            background: #090d16;
+            border-radius: 8px;
+            border: 1px solid var(--card-border);
+            margin-bottom: 16px;
+            display: block;
+        }
+
+        .controls {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            background: #0284c7;
+            color: #ffffff;
+            border: none;
+            padding: 10px 18px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.2s;
+        }
+
+        .btn:hover {
+            background: #0369a1;
+            box-shadow: 0 0 12px var(--accent-glow);
+        }
+
+        .btn-danger {
+            background: #dc2626;
+        }
+        .btn-danger:hover {
+            background: #b91c1c;
+        }
+
+        .btn-secondary {
+            background: #23314d;
+            color: #f1f5f9;
+        }
+        .btn-secondary:hover {
+            background: #334155;
+        }
+
+        .volume-box {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--text-muted);
+            font-size: 13px;
+        }
+
+        input[type=range] {
+            accent-color: var(--accent-color);
+            cursor: pointer;
+        }
+
+        /* Live Subtitles List */
+        .transcript-list {
+            height: 250px;
+            overflow-y: auto;
+            background: #090d16;
+            border-radius: 8px;
+            border: 1px solid var(--card-border);
+            padding: 14px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .transcript-item {
+            padding: 10px 14px;
+            background: #192338;
+            border-left: 3px solid var(--accent-color);
+            border-radius: 6px;
+            font-size: 14px;
+            line-height: 1.6;
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(6px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .transcript-time {
+            font-size: 11px;
+            color: var(--accent-color);
+            font-family: 'JetBrains Mono', monospace;
+            margin-bottom: 4px;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .transcript-text {
+            color: #f8fafc;
+            font-weight: 500;
+        }
+
+        .tag-group {
+            display: inline-flex;
+            gap: 5px;
+            align-items: center;
+        }
+
+        .tag {
+            display: inline-flex;
+            align-items: center;
+            padding: 1px 6px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 500;
+            line-height: 1.3;
+        }
+
+        .tag-lang {
+            background: rgba(56, 189, 248, 0.12);
+            color: #38bdf8;
+            border: 1px solid rgba(56, 189, 248, 0.3);
+        }
+
+        .tag-emo {
+            background: rgba(245, 158, 11, 0.15);
+            color: #fbbf24;
+            border: 1px solid rgba(245, 158, 11, 0.3);
+        }
+
+        .tag-event {
+            background: rgba(168, 85, 247, 0.15);
+            color: #c084fc;
+            border: 1px solid rgba(168, 85, 247, 0.3);
+        }
+
+        .transcript-translation {
+            margin-top: 6px;
+            padding: 6px 10px;
+            background: rgba(56, 189, 248, 0.08);
+            border-left: 2px solid #38bdf8;
+            border-radius: 0 4px 4px 0;
+            color: #7dd3fc;
+            font-size: 13.5px;
+            line-height: 1.5;
+            display: flex;
+            align-items: flex-start;
+            gap: 6px;
+        }
+
+        .trans-badge {
+            display: inline-block;
+            background: #0284c7;
+            color: #ffffff;
+            font-size: 10px;
+            font-weight: 600;
+            padding: 1px 4px;
+            border-radius: 3px;
+            flex-shrink: 0;
+            margin-top: 2px;
+        }
+
+        /* Continuous Recordings Card */
+        .recordings-card {
+            grid-column: 1 / -1;
+        }
+
+        .recordings-table-wrap {
+            max-height: 340px;
+            overflow-y: auto;
+            border: 1px solid var(--card-border);
+            border-radius: 8px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: left;
+            font-size: 13px;
+        }
+
+        th, td {
+            padding: 14px 16px;
+            border-bottom: 1px solid var(--card-border);
+        }
+
+        th {
+            background: #090d16;
+            color: var(--text-muted);
+            font-weight: 500;
+            position: sticky;
+            top: 0;
+            z-index: 2;
+        }
+
+        tr:hover td {
+            background: rgba(255, 255, 255, 0.02);
+        }
+
+        audio {
+            height: 32px;
+            max-width: 210px;
+        }
+
+        .empty-placeholder {
+            text-align: center;
+            color: var(--text-muted);
+            padding: 30px;
+            font-size: 13px;
+        }
+
+        /* File Management Toolbar */
+        .recordings-toolbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+        }
+
+        .search-box {
+            position: relative;
+            flex: 1;
+            min-width: 220px;
+            max-width: 360px;
+        }
+
+        .search-input {
+            width: 100%;
+            background: #090d16;
+            border: 1px solid var(--card-border);
+            color: #f8fafc;
+            padding: 7px 12px 7px 32px;
+            border-radius: 6px;
+            font-size: 13px;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .search-input:focus {
+            border-color: var(--accent-color);
+        }
+
+        .search-icon {
+            position: absolute;
+            left: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-muted);
+            font-size: 13px;
+            pointer-events: none;
+        }
+
+        .toolbar-actions {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        /* Action Buttons */
+        .btn-action {
+            padding: 4px 8px;
+            font-size: 12px;
+            border-radius: 5px;
+            border: 1px solid var(--card-border);
+            background: #1e293b;
+            color: #cbd5e1;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            text-decoration: none;
+        }
+
+        .btn-action:hover {
+            background: #334155;
+            color: #ffffff;
+            border-color: #64748b;
+        }
+
+        .btn-action-primary {
+            background: rgba(56, 189, 248, 0.12);
+            color: #38bdf8;
+            border-color: rgba(56, 189, 248, 0.3);
+        }
+
+        .btn-action-primary:hover {
+            background: rgba(56, 189, 248, 0.25);
+            border-color: #38bdf8;
+        }
+
+        .btn-action-danger {
+            background: rgba(239, 68, 68, 0.12);
+            color: #f87171;
+            border-color: rgba(239, 68, 68, 0.3);
+        }
+
+        .btn-action-danger:hover {
+            background: rgba(239, 68, 68, 0.25);
+            border-color: #ef4444;
+            color: #fca5a5;
+        }
+
+        .btn-action:disabled {
+            opacity: 0.35;
+            cursor: not-allowed;
+            pointer-events: none;
+        }
+
+        /* Modals */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.75);
+            backdrop-filter: blur(4px);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .modal-overlay.active {
+            display: flex;
+        }
+
+        .modal-card {
+            background: #0f172a;
+            border: 1px solid var(--card-border);
+            border-radius: 12px;
+            width: 90%;
+            max-width: 680px;
+            max-height: 85vh;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);
+            animation: modalPop 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        @keyframes modalPop {
+            from { transform: scale(0.95); opacity: 0; }
+            to { transform: scale(1); opacity: 1; }
+        }
+
+        .modal-header {
+            padding: 16px 20px;
+            border-bottom: 1px solid var(--card-border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-header h3 {
+            font-size: 16px;
+            font-weight: 600;
+            color: #f8fafc;
+            margin: 0;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            font-size: 20px;
+            cursor: pointer;
+            padding: 4px 8px;
+            border-radius: 4px;
+            line-height: 1;
+        }
+
+        .modal-close:hover {
+            color: #fff;
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .modal-body {
+            padding: 20px;
+            overflow-y: auto;
+            flex: 1;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 13.5px;
+            line-height: 1.7;
+            white-space: pre-wrap;
+            color: #e2e8f0;
+            background: #090d16;
+            margin: 16px 20px;
+            border-radius: 8px;
+            border: 1px solid var(--card-border);
+        }
+
+        .modal-footer {
+            padding: 14px 20px;
+            border-top: 1px solid var(--card-border);
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+        }
+
+        /* Toast notifications */
+        .toast {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            background: #1e293b;
+            border: 1px solid var(--accent-color);
+            color: #f8fafc;
+            padding: 12px 20px;
+            border-radius: 8px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+            font-size: 13px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            z-index: 1100;
+            opacity: 0;
+            transform: translateY(10px);
+            transition: all 0.25s ease;
+            pointer-events: none;
+        }
+
+        .toast.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="title-group">
+                <h1>🎙️ ESP32-S3 实时音频监听与 SenseVoice 多语种同传</h1>
+                <p>长音频连续无缝归档 ➔ 80Hz 纯净滤波 ➔ 阿里 SenseVoice-Small 听写 ➔ 双语同传实时翻译 (英/日/韩/粤 ➔ 🇨🇳 中文)</p>
+            </div>
+            <div class="status-badges">
+                <div id="deviceBadge" class="badge">
+                    <span class="badge-dot"></span>
+                    <span id="deviceStatusText">ESP32 离线</span>
+                </div>
+                <div class="badge" style="border-color: #38bdf8;">
+                    <span id="asrEngineBadge">🚀 SenseVoice-Small (Intel CPU 加速)</span>
+                </div>
+            </div>
+        </header>
+
+        <div class="grid">
+            <!-- 实时收听与波形 -->
+            <div class="card">
+                <div class="card-header">
+                    <h2>🎧 实时音频监听 (Live Listen)</h2>
+                    <span id="audioRxStats" style="font-size: 12px; color: var(--text-muted); font-family: 'JetBrains Mono';">待机</span>
+                </div>
+                
+                <canvas id="visualizer"></canvas>
+
+                <div class="controls">
+                    <button id="toggleAudioBtn" class="btn">
+                        <span>▶ 开启实时收听</span>
+                    </button>
+                    <div class="volume-box">
+                        <span>音量</span>
+                        <input id="volumeSlider" type="range" min="0" max="2" step="0.05" value="1" style="width: 90px;">
+                    </div>
+                    <div style="margin-left: auto; font-size: 12px; color: var(--text-muted);">
+                        当前录音会话: <span id="currentSessionTag" style="color: var(--accent-color); font-family: 'JetBrains Mono';">-</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 实时流式字幕 -->
+            <div class="card">
+                <div class="card-header">
+                    <h2>📝 实时字幕 (流式同传)</h2>
+                    <button id="clearTranscriptsBtn" class="btn btn-secondary" style="padding: 4px 10px; font-size: 12px;">清空</button>
+                </div>
+
+                <div id="transcriptList" class="transcript-list">
+                    <div class="empty-placeholder">人声智能检测中：说完整一句话停顿后，即刻自动流式输出字幕...</div>
+                </div>
+            </div>
+
+            <!-- 连续归档录音列表 -->
+            <div class="card recordings-card">
+                <div class="card-header">
+                    <h2>📁 连续录音归档与文件管理中心 (.wav & .txt)</h2>
+                    <div id="recordingsStatsBadge" class="badge" style="border-color: #38bdf8; color: #38bdf8; font-size: 12px;">
+                        📁 0 个归档 · 0 MB
+                    </div>
+                </div>
+
+                <!-- 文件管理工具栏 -->
+                <div class="recordings-toolbar">
+                    <div class="search-box">
+                        <span class="search-icon">🔍</span>
+                        <input type="text" id="recordingsSearchInput" class="search-input" placeholder="搜索文件名、日期或纪要关键词...">
+                    </div>
+                    <div class="toolbar-actions">
+                        <button id="refreshRecordingsBtn" class="btn-action" style="padding: 6px 12px;">
+                            🔄 刷新
+                        </button>
+                        <button id="batchDeleteBtn" class="btn-action btn-action-danger" style="padding: 6px 12px;">
+                            🗑️ 清空所有历史
+                        </button>
+                    </div>
+                </div>
+
+                <div class="recordings-table-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th style="width: 26%;">录音名称 / 时间</th>
+                                <th style="width: 10%;">时长</th>
+                                <th style="width: 9%;">大小</th>
+                                <th style="width: 25%;">内容摘要</th>
+                                <th style="width: 15%;">原声音频试听</th>
+                                <th style="width: 15%;">文件操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="recordingsTableBody">
+                            <tr><td colspan="6" class="empty-placeholder">暂无连续录音文件</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 全篇纪要弹窗 Modal -->
+    <div id="transcriptModal" class="modal-overlay">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3>📄 全篇纪要：<span id="modalFilename" style="color:var(--accent-color); font-family:'JetBrains Mono',monospace; font-size:13px;"></span></h3>
+                <button class="modal-close" id="closeTranscriptModalBtn">&times;</button>
+            </div>
+            <div id="modalTranscriptBody" class="modal-body"></div>
+            <div class="modal-footer">
+                <button id="copyTranscriptBtn" class="btn-action btn-action-primary" style="padding: 6px 14px; font-size: 13px;">📋 复制全部文字</button>
+                <a id="downloadModalTxtBtn" download class="btn-action" style="padding: 6px 14px; font-size: 13px;">⬇️ 导出 TXT</a>
+                <button id="closeModalBtn" class="btn btn-secondary" style="padding: 6px 14px; font-size: 13px;">关闭</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 重命名弹窗 Modal -->
+    <div id="renameModal" class="modal-overlay">
+        <div class="modal-card" style="max-width: 480px;">
+            <div class="modal-header">
+                <h3>✏️ 自定义重命名</h3>
+                <button class="modal-close" id="closeRenameModalBtn">&times;</button>
+            </div>
+            <div style="padding: 20px;">
+                <div style="font-size:12px; color:var(--text-muted); margin-bottom:10px;">原文件名：<span id="renameOriginalName" style="color:#f8fafc; font-family:'JetBrains Mono',monospace;"></span></div>
+                <label style="display:block; font-size:13px; color:#f8fafc; font-weight:600; margin-bottom:8px;">新名称（无需写后缀，配套 .txt 将自动同步）：</label>
+                <input type="text" id="renameInput" class="search-input" style="padding-left:12px; font-size:14px; width:100%;" placeholder="例如：20260906_产品技术方案评审会">
+            </div>
+            <div class="modal-footer">
+                <button id="cancelRenameBtn" class="btn btn-secondary" style="padding: 6px 14px; font-size: 13px;">取消</button>
+                <button id="confirmRenameBtn" class="btn-action btn-action-primary" style="padding: 6px 14px; font-size: 13px;">确定修改</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 浮动通知 Toast -->
+    <div id="toast" class="toast"></div>
+
+    <script>
+        let audioCtx = null;
+        let gainNode = null;
+        let isListening = false;
+        let nextPlayTime = 0;
+
+        const canvas = document.getElementById("visualizer");
+        const canvasCtx = canvas.getContext("2d");
+        canvas.width = canvas.offsetWidth;
+        canvas.height = canvas.offsetHeight;
+        let waveformSamples = new Float32Array(512);
+
+        const toggleAudioBtn = document.getElementById("toggleAudioBtn");
+        const volumeSlider = document.getElementById("volumeSlider");
+        const deviceBadge = document.getElementById("deviceBadge");
+        const deviceStatusText = document.getElementById("deviceStatusText");
+        const audioRxStats = document.getElementById("audioRxStats");
+        const transcriptList = document.getElementById("transcriptList");
+        const recordingsTableBody = document.getElementById("recordingsTableBody");
+        const currentSessionTag = document.getElementById("currentSessionTag");
+
+        function initAudio() {
+            if (!audioCtx) {
+                const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+                audioCtx = new AudioContextClass({ sampleRate: 16000 });
+                gainNode = audioCtx.createGain();
+                gainNode.gain.value = parseFloat(volumeSlider.value);
+                gainNode.connect(audioCtx.destination);
+                nextPlayTime = audioCtx.currentTime;
+            }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }
+
+        toggleAudioBtn.addEventListener("click", () => {
+            initAudio();
+            isListening = !isListening;
+            if (isListening) {
+                nextPlayTime = 0;
+                toggleAudioBtn.innerHTML = "⏹ 停止收听";
+                toggleAudioBtn.classList.add("btn-danger");
+            } else {
+                nextPlayTime = 0;
+                toggleAudioBtn.innerHTML = "▶ 开启实时收听";
+                toggleAudioBtn.classList.remove("btn-danger");
+            }
+        });
+
+        volumeSlider.addEventListener("input", (e) => {
+            if (gainNode) {
+                gainNode.gain.value = parseFloat(e.target.value);
+            }
+        });
+
+        const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+        const wsUrl = `${protocol}//${window.location.host}/ws/live_listen`;
+        let ws = null;
+        let bytesCount = 0;
+
+        function connectWebSocket() {
+            ws = new WebSocket(wsUrl);
+            ws.binaryType = "arraybuffer";
+
+            ws.onopen = () => console.log("[WS] Connected");
+
+            ws.onmessage = (event) => {
+                if (typeof event.data === "string") {
+                    const msg = JSON.parse(event.data);
+                    handleJsonMessage(msg);
+                } else if (event.data instanceof ArrayBuffer) {
+                    bytesCount += event.data.byteLength;
+                    handleAudioPcm(event.data);
+                }
+            };
+
+            ws.onclose = () => {
+                setTimeout(connectWebSocket, 2000);
+            };
+        }
+
+        function handleJsonMessage(msg) {
+            if (msg.type === "device_status") {
+                if (msg.connected) {
+                    deviceBadge.className = "badge badge-online";
+                    deviceStatusText.innerText = "ESP32 已连接";
+                } else {
+                    deviceBadge.className = "badge";
+                    deviceStatusText.innerText = "ESP32 离线";
+                }
+                updateStatus();
+            } else if (msg.type === "live_transcript") {
+                appendTranscript(msg.data);
+            }
+        }
+
+        function handleAudioPcm(arrayBuffer) {
+            const int16Array = new Int16Array(arrayBuffer);
+            const float32Array = new Float32Array(int16Array.length);
+
+            for (let i = 0; i < int16Array.length; i++) {
+                const norm = int16Array[i] / 32768.0;
+                float32Array[i] = norm;
+                if (i < waveformSamples.length) {
+                    waveformSamples[i] = norm;
+                }
+            }
+
+            if (isListening && audioCtx) {
+                const audioBuffer = audioCtx.createBuffer(1, float32Array.length, 16000);
+                audioBuffer.copyToChannel(float32Array, 0);
+
+                const source = audioCtx.createBufferSource();
+                source.buffer = audioBuffer;
+                source.connect(gainNode);
+
+                const now = audioCtx.currentTime;
+                // Jitter buffer safety margin: 80ms runway for arrival variations
+                if (nextPlayTime < now) {
+                    nextPlayTime = now + 0.08;
+                }
+                source.start(nextPlayTime);
+                nextPlayTime += audioBuffer.duration;
+            }
+        }
+
+        function drawOscilloscope() {
+            requestAnimationFrame(drawOscilloscope);
+
+            canvasCtx.fillStyle = "#090d16";
+            canvasCtx.fillRect(0, 0, canvas.width, canvas.height);
+
+            canvasCtx.lineWidth = 2;
+            canvasCtx.strokeStyle = "#38bdf8";
+            canvasCtx.beginPath();
+
+            const sliceWidth = canvas.width / waveformSamples.length;
+            let x = 0;
+
+            for (let i = 0; i < waveformSamples.length; i++) {
+                const v = waveformSamples[i];
+                const y = (canvas.height / 2) + (v * canvas.height * 0.9);
+
+                if (i === 0) {
+                    canvasCtx.moveTo(x, y);
+                } else {
+                    canvasCtx.lineTo(x, y);
+                }
+                x += sliceWidth;
+            }
+
+            canvasCtx.stroke();
+        }
+        drawOscilloscope();
+
+        setInterval(() => {
+            const kbps = ((bytesCount * 8) / 1024).toFixed(1);
+            audioRxStats.innerText = `${kbps} kbps`;
+            bytesCount = 0;
+        }, 1000);
+
+        function appendTranscript(data) {
+            const placeholder = transcriptList.querySelector(".empty-placeholder");
+            if (placeholder) placeholder.remove();
+
+            let tagsHtml = '';
+            if (data.lang) {
+                tagsHtml += `<span class="tag tag-lang">${escapeHtml(data.lang)}</span>`;
+            }
+            if (data.emotion && !data.emotion.includes("平静")) {
+                tagsHtml += `<span class="tag tag-emo">${escapeHtml(data.emotion)}</span>`;
+            }
+            if (data.event && !data.event.includes("说话")) {
+                tagsHtml += `<span class="tag tag-event">${escapeHtml(data.event)}</span>`;
+            }
+
+            let transHtml = '';
+            if (data.translation) {
+                transHtml = `
+                    <div class="transcript-translation">
+                        <span class="trans-badge">译</span>
+                        <span>${escapeHtml(data.translation)}</span>
+                    </div>
+                `;
+            }
+
+            const item = document.createElement("div");
+            item.className = "transcript-item";
+            item.innerHTML = `
+                <div class="transcript-time">
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        <span>${data.timestamp}</span>
+                        ${tagsHtml ? `<span class="tag-group">${tagsHtml}</span>` : ''}
+                    </div>
+                    <span>${data.duration || ''}</span>
+                </div>
+                <div class="transcript-text">${escapeHtml(data.text)}</div>
+                ${transHtml}
+            `;
+            transcriptList.appendChild(item);
+            transcriptList.scrollTop = transcriptList.scrollHeight;
+        }
+
+        function escapeHtml(str) {
+            return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+        }
+
+        document.getElementById("clearTranscriptsBtn").addEventListener("click", () => {
+            transcriptList.innerHTML = '<div class="empty-placeholder">已清空，等待新识别...</div>';
+        });
+
+        async function updateStatus() {
+            try {
+                const res = await fetch("/api/status");
+                const data = await res.json();
+                currentSessionTag.innerText = data.current_session || "未开始";
+            } catch(e) {}
+        }
+
+        // ---------------------------------------------------------
+        // File Management & Recordings State
+        // ---------------------------------------------------------
+        let allRecordings = [];
+        let recordingsSearchQuery = "";
+        let currentRenameOldName = "";
+
+        const recordingsStatsBadge = document.getElementById("recordingsStatsBadge");
+        const recordingsSearchInput = document.getElementById("recordingsSearchInput");
+        const batchDeleteBtn = document.getElementById("batchDeleteBtn");
+
+        // Toast Helper
+        function showToast(message, isError = false) {
+            const toast = document.getElementById("toast");
+            toast.innerText = message;
+            toast.style.borderColor = isError ? "#ef4444" : "var(--accent-color)";
+            toast.style.color = isError ? "#fca5a5" : "#f8fafc";
+            toast.classList.add("show");
+            setTimeout(() => {
+                toast.classList.remove("show");
+            }, 2600);
+        }
+
+        async function loadRecordings() {
+            try {
+                const res = await fetch("/api/recordings");
+                const result = await res.json();
+                const files = Array.isArray(result) ? result : (result.files || []);
+                const totalCount = result.total_count !== undefined ? result.total_count : files.length;
+                const totalSizeMb = result.total_size_mb !== undefined ? result.total_size_mb : 0;
+
+                allRecordings = files;
+                if (recordingsStatsBadge) {
+                    recordingsStatsBadge.innerText = `📁 ${totalCount} 个归档 · ${totalSizeMb} MB`;
+                }
+                renderRecordingsTable();
+            } catch (err) {
+                console.error("Failed to load recordings:", err);
+            }
+        }
+
+        function renderRecordingsTable() {
+            let files = allRecordings;
+            if (recordingsSearchQuery) {
+                const q = recordingsSearchQuery.toLowerCase();
+                files = files.filter(f => 
+                    f.filename.toLowerCase().includes(q) ||
+                    (f.transcript_summary && f.transcript_summary.toLowerCase().includes(q)) ||
+                    (f.created_at && f.created_at.includes(q))
+                );
+            }
+
+            if (!files || files.length === 0) {
+                recordingsTableBody.innerHTML = `<tr><td colspan="6" class="empty-placeholder">${recordingsSearchQuery ? '未找到匹配的录音文件' : '暂无连续录音文件'}</td></tr>`;
+                return;
+            }
+
+            recordingsTableBody.innerHTML = files.map(file => {
+                const safeName = escapeHtml(file.filename);
+                const activeTag = file.is_active ? ' <span class="tag" style="background:rgba(239,68,68,0.2); color:#f87171; border:1px solid rgba(239,68,68,0.4); margin-left:4px;">🔴 正在录制</span>' : '';
+                return `
+                    <tr>
+                        <td>
+                            <strong>${safeName}</strong>${activeTag}
+                            <br><small style="color:var(--text-muted); font-size:11px;">${file.created_at}</small>
+                        </td>
+                        <td><span style="color:var(--accent-color); font-weight:600;">${file.duration}</span></td>
+                        <td>${file.size_mb} MB</td>
+                        <td style="max-width: 280px; color: #cbd5e1; word-break: break-word; font-size: 12.5px;">
+                            ${escapeHtml(file.transcript_summary || '(纪要记录中...)')}
+                        </td>
+                        <td>
+                            <audio controls preload="none" src="/recordings/${encodeURIComponent(file.filename)}"></audio>
+                        </td>
+                        <td>
+                            <div style="display:flex; gap:5px; flex-wrap:wrap; align-items:center;">
+                                <button class="btn-action btn-action-primary" onclick="openTranscriptModal('${safeName}')" title="查看完整识别纪要">
+                                    📄 纪要
+                                </button>
+                                <button class="btn-action" ${file.is_active ? 'disabled title="录制中不可重命名"' : ''} onclick="openRenameModal('${safeName}')" title="重命名">
+                                    ✏️
+                                </button>
+                                <a href="/recordings/${encodeURIComponent(file.filename)}" download class="btn-action" title="下载 WAV 原声音频">
+                                    ⬇️ 音频
+                                </a>
+                                <a href="/recordings/${encodeURIComponent(file.filename)}/download_txt" download class="btn-action" title="导出 TXT 文字纪要">
+                                    📝 TXT
+                                </a>
+                                <button class="btn-action btn-action-danger" ${file.is_active ? 'disabled title="录制中不可删除"' : ''} onclick="deleteRecording('${safeName}')" title="永久删除">
+                                    🗑️
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            }).join("");
+        }
+
+        // Real-time search filter
+        recordingsSearchInput.addEventListener("input", (e) => {
+            recordingsSearchQuery = e.target.value.trim();
+            renderRecordingsTable();
+        });
+
+        // Transcript Modal Handlers
+        const transcriptModal = document.getElementById("transcriptModal");
+        const modalFilename = document.getElementById("modalFilename");
+        const modalTranscriptBody = document.getElementById("modalTranscriptBody");
+        const downloadModalTxtBtn = document.getElementById("downloadModalTxtBtn");
+        const copyTranscriptBtn = document.getElementById("copyTranscriptBtn");
+
+        async function openTranscriptModal(filename) {
+            modalFilename.innerText = filename;
+            modalTranscriptBody.innerText = "正在读取纪要内容...";
+            downloadModalTxtBtn.href = `/recordings/${encodeURIComponent(filename)}/download_txt`;
+            transcriptModal.classList.add("active");
+
+            try {
+                const res = await fetch(`/api/recordings/${encodeURIComponent(filename)}/transcript`);
+                const data = await res.json();
+                modalTranscriptBody.innerText = data.transcript ? data.transcript : "（该会话暂无语音转写文字记录）";
+            } catch (err) {
+                modalTranscriptBody.innerText = "读取纪要失败: " + err;
+            }
+        }
+
+        function closeTranscriptModal() {
+            transcriptModal.classList.remove("active");
+        }
+
+        document.getElementById("closeTranscriptModalBtn").addEventListener("click", closeTranscriptModal);
+        document.getElementById("closeModalBtn").addEventListener("click", closeTranscriptModal);
+        transcriptModal.addEventListener("click", (e) => {
+            if (e.target === transcriptModal) closeTranscriptModal();
+        });
+
+        copyTranscriptBtn.addEventListener("click", () => {
+            const text = modalTranscriptBody.innerText;
+            if (!text) return;
+            navigator.clipboard.writeText(text).then(() => {
+                const orig = copyTranscriptBtn.innerHTML;
+                copyTranscriptBtn.innerHTML = "✅ 已复制到剪贴板！";
+                setTimeout(() => { copyTranscriptBtn.innerHTML = orig; }, 2000);
+            }).catch(() => {
+                showToast("复制失败，请手动选取文字复制", true);
+            });
+        });
+
+        // Rename Modal Handlers
+        const renameModal = document.getElementById("renameModal");
+        const renameOriginalName = document.getElementById("renameOriginalName");
+        const renameInput = document.getElementById("renameInput");
+        const confirmRenameBtn = document.getElementById("confirmRenameBtn");
+
+        function openRenameModal(filename) {
+            currentRenameOldName = filename;
+            renameOriginalName.innerText = filename;
+            const base = filename.replace(/\.wav$/i, "");
+            renameInput.value = base;
+            renameModal.classList.add("active");
+            setTimeout(() => renameInput.focus(), 100);
+        }
+
+        function closeRenameModal() {
+            renameModal.classList.remove("active");
+            currentRenameOldName = "";
+        }
+
+        document.getElementById("closeRenameModalBtn").addEventListener("click", closeRenameModal);
+        document.getElementById("cancelRenameBtn").addEventListener("click", closeRenameModal);
+        renameModal.addEventListener("click", (e) => {
+            if (e.target === renameModal) closeRenameModal();
+        });
+
+        confirmRenameBtn.addEventListener("click", async () => {
+            const newName = renameInput.value.trim();
+            if (!newName) {
+                alert("请输入新名称！");
+                return;
+            }
+            confirmRenameBtn.disabled = true;
+            try {
+                const res = await fetch(`/api/recordings/${encodeURIComponent(currentRenameOldName)}/rename`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ new_name: newName })
+                });
+                const data = await res.json();
+                if (res.ok && data.success) {
+                    showToast(`重命名成功 ➔ ${data.new_filename}`);
+                    closeRenameModal();
+                    loadRecordings();
+                } else {
+                    alert(data.error || "重命名失败");
+                }
+            } catch (err) {
+                alert("请求失败: " + err);
+            } finally {
+                confirmRenameBtn.disabled = false;
+            }
+        });
+
+        renameInput.addEventListener("keydown", (e) => {
+            if (e.key === "Enter") {
+                confirmRenameBtn.click();
+            }
+        });
+
+        // Delete Single Recording
+        async function deleteRecording(filename) {
+            if (!confirm(`确定要永久删除录音「${filename}」及其文字纪要吗？此操作无法撤销。`)) {
+                return;
+            }
+            try {
+                const res = await fetch(`/api/recordings/${encodeURIComponent(filename)}`, {
+                    method: "DELETE"
+                });
+                const data = await res.json();
+                if (res.ok && data.success) {
+                    showToast(`已成功删除 ${filename}`);
+                    loadRecordings();
+                } else {
+                    showToast(data.error || "删除失败", true);
+                }
+            } catch (err) {
+                showToast("删除请求错误: " + err, true);
+            }
+        }
+
+        // Batch Delete All Non-Active Recordings
+        batchDeleteBtn.addEventListener("click", async () => {
+            if (!confirm("⚠️ 警告：确定要清空所有历史归档文件吗？\n（正在录制中的会话将受保护被保留）\n此操作不可撤销！")) {
+                return;
+            }
+            try {
+                const res = await fetch("/api/recordings", { method: "DELETE" });
+                const data = await res.json();
+                if (res.ok) {
+                    showToast(`已清理 ${data.deleted_count} 个历史文件`);
+                    loadRecordings();
+                } else {
+                    showToast(data.error || "清空失败", true);
+                }
+            } catch (err) {
+                showToast("清空请求错误: " + err, true);
+            }
+        });
+
+        document.getElementById("refreshRecordingsBtn").addEventListener("click", () => {
+            loadRecordings();
+            updateStatus();
+            showToast("录音列表已刷新");
+        });
+
+        window.addEventListener("resize", () => {
+            canvas.width = canvas.offsetWidth;
+            canvas.height = canvas.offsetHeight;
+        });
+
+        connectWebSocket();
+        loadRecordings();
+        updateStatus();
+        setInterval(updateStatus, 5000);
+        setInterval(loadRecordings, 15000);
+    </script>
+</body>
+</html>

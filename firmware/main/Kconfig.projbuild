@@ -1,0 +1,52 @@
+menu "Audio Streamer & WiFi Configuration"
+
+    config ESP_WIFI_SSID
+        string "WiFi SSID"
+        default "myssid"
+        help
+            SSID of the 2.4GHz WiFi network.
+
+    config ESP_WIFI_PASSWORD
+        string "WiFi Password"
+        default "mypassword"
+        help
+            Password of the WiFi network.
+
+    config SERVER_HOST
+        string "Server Host / Mac IP"
+        default "192.168.1.100"
+        help
+            IP address of your Mac or host running the Python server.
+
+    config SERVER_PORT
+        int "Server Port"
+        default 8000
+        help
+            Port of the Python server (default 8000).
+
+    config I2S_MIC_SCK_GPIO
+        int "I2S SCK (BCLK) GPIO"
+        default 5
+        help
+            GPIO pin connected to INMP441 SCK (Xiaozhi default: 5).
+
+    config I2S_MIC_WS_GPIO
+        int "I2S WS (LRCLK) GPIO"
+        default 4
+        help
+            GPIO pin connected to INMP441 WS (Xiaozhi default: 4).
+
+    config I2S_MIC_SD_GPIO
+        int "I2S SD (DIN) GPIO"
+        default 6
+        help
+            GPIO pin connected to INMP441 SD (Xiaozhi default: 6).
+
+    config AUDIO_GAIN_BOOST
+        int "Audio Software Gain Multiplier"
+        default 2
+        range 1 16
+        help
+            Software digital gain boost factor for microphone audio.
+
+endmenu

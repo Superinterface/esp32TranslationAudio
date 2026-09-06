@@ -1,0 +1,48 @@
+# ==============================================================================
+# Git Ignore Configuration for ESP32-S3 Audio Whisper
+# ==============================================================================
+
+# 1. Sensitive Credentials & Personal Environment Configurations
+config.env
+*.env
+!config.env.example
+!.env.example
+
+# 2. ESP-IDF Firmware Build Artifacts & Generated Files
+firmware/build/
+firmware/sdkconfig
+firmware/sdkconfig.old
+firmware/dependencies.lock
+firmware/managed_components/
+firmware/main/app_config_auto.h
+
+# 3. Python Virtual Environments & Bytecode
+.venv/
+server/.venv/
+**/__pycache__/
+*.py[cod]
+*$py.class
+
+# 4. User Private Audio Recordings & Transcripts (CRITICAL PRIVACY)
+server/recordings/
+recordings/
+*.wav
+*.mp3
+*.m4a
+
+# 5. Heavy AI Model Weights (>100MB cannot be pushed to GitHub)
+server/models/
+models/
+*.onnx
+
+# 6. System & IDE Temporary Files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+*.log
+.vscode/
+.idea/
