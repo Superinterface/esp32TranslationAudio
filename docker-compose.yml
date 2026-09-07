@@ -1,11 +1,10 @@
-version: "3.8"
-
 services:
   esp32-audio-backend:
     build:
       context: ./server
       dockerfile: Dockerfile
     image: esp32-translation-audio:latest
+    pull_policy: build
     container_name: esp32-audio-server
     restart: unless-stopped
     ports:
