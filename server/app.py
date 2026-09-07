@@ -26,6 +26,7 @@ def load_app_config():
         "TRANSLATE_TARGET": "zh",
         "VAD_THRESHOLD": 0.5,
         "SILENCE_THRESHOLD_SECONDS": 0.65,
+        "NUM_THREADS": 2,
     }
     candidates = [
         os.path.join(os.path.dirname(__file__), "..", "config.env"),
@@ -43,7 +44,7 @@ def load_app_config():
                         if line and not line.startswith("#") and "=" in line:
                             k, v = line.split("=", 1)
                             k, v = k.strip(), v.strip().strip('"').strip("'")
-                            if k == "SERVER_PORT":
+                            if k in ("SERVER_PORT", "NUM_THREADS"):
                                 cfg[k] = int(v)
                             elif k in ("VAD_THRESHOLD", "SILENCE_THRESHOLD_SECONDS"):
                                 cfg[k] = float(v)
@@ -52,6 +53,18 @@ def load_app_config():
             except Exception as e:
                 print(f"[Config] Warning: error reading {c}: {e}")
             break
+
+    # Environment variables take highest priority (standard for Docker)
+    for k in list(cfg.keys()):
+        if k in os.environ:
+            v = os.environ[k].strip().strip('"').strip("'")
+            if k in ("SERVER_PORT", "NUM_THREADS"):
+                cfg[k] = int(v)
+            elif k in ("VAD_THRESHOLD", "SILENCE_THRESHOLD_SECONDS"):
+                cfg[k] = float(v)
+            else:
+                cfg[k] = v
+
     return cfg
 
 APP_CONFIG = load_app_config()
@@ -343,11 +356,12 @@ def init_asr():
     if os.path.exists(model_file) and os.path.exists(tokens_file):
         try:
             import sherpa_onnx
-            print(f"[ASR] 🚀 Loading Alibaba SenseVoice-Small (Intel CPU optimized, Multilingual zh/en/ja/ko/yue)...")
+            threads = APP_CONFIG.get("NUM_THREADS", 2)
+            print(f"[ASR] 🚀 Loading Alibaba SenseVoice-Small (CPU optimized, threads={threads}, Multilingual zh/en/ja/ko/yue)...")
             recognizer = sherpa_onnx.OfflineRecognizer.from_sense_voice(
                 model=model_file,
                 tokens=tokens_file,
-                num_threads=4,
+                num_threads=threads,
                 use_itn=True,
             )
             asr_engine = recognizer

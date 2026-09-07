@@ -1,0 +1,26 @@
+version: "3.8"
+
+services:
+  esp32-audio-backend:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    image: esp32-translation-audio:latest
+    container_name: esp32-audio-server
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - SERVER_PORT=8000
+      - NUM_THREADS=2
+      - DEFAULT_LANGUAGE=auto
+      - TRANSLATE_TARGET=zh
+      - VAD_THRESHOLD=0.5
+      - SILENCE_THRESHOLD_SECONDS=0.65
+    volumes:
+      # 1. 录音与识别文本持久化（映射到宿主机，方便随时查看提取）
+      - ./server/recordings:/app/recordings
+      # 2. (可选) 挂载统一配置文件
+      - ./config.env:/app/config.env:ro
+      # 3. (可选) 挂载模型目录（避免容器销毁后重复下载模型）
+      - ./server/models:/app/models

@@ -159,6 +159,17 @@ SERVER_PORT=8000
    [Server] 🌐 Starting server at http://0.0.0.0:8000
    ```
 
+#### 🐳 进阶选择：使用 Docker / Docker Compose 一键运行（推荐在服务器/NAS/青龙环境）
+如果您希望在 Linux 主机、软路由或 NAS 上免配环境直接跑：
+```bash
+# 1. 根目录下直接一键构建并后台启动
+docker compose up -d
+
+# 2. 查看运行日志
+docker compose logs -f
+```
+> 录音文件与文本自动持久化保存在宿主机的 `server/recordings` 目录中，随时可在网页端或本地查看。
+
 ---
 
 ### 第三步：编译并烧录 ESP32-S3 固件
