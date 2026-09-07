@@ -23,7 +23,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Install lean Python dependencies (Only SenseVoice INT8 + VAD stack, NO PyTorch/bloat)
 COPY requirements-docker.txt .
-RUN pip install --no-cache-dir -r requirements-docker.txt
+RUN pip install --no-cache-dir -i https://pypi.tuna.tsinghua.edu.cn/simple --extra-index-url https://pypi.org/simple -r requirements-docker.txt
 
 # Copy application files and static web assets
 COPY app.py download_models.py entrypoint.sh ./
