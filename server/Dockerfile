@@ -21,9 +21,19 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-# Install lean Python dependencies (Only SenseVoice INT8 + VAD stack, NO PyTorch/bloat)
-COPY requirements-docker.txt .
-RUN pip install --no-cache-dir -i https://pypi.tuna.tsinghua.edu.cn/simple --extra-index-url https://pypi.org/simple -r requirements-docker.txt
+# Install lean Python dependencies (Using domestic high-speed Tsinghua mirror)
+# Quoted with double quotes to prevent any Linux /bin/sh shell redirection (< or >) errors
+RUN pip install --no-cache-dir \
+    -i https://pypi.tuna.tsinghua.edu.cn/simple \
+    --extra-index-url https://pypi.org/simple \
+    "fastapi>=0.100.0" \
+    "uvicorn[standard]>=0.23.0" \
+    "websockets>=11.0" \
+    "numpy>=1.24.0" \
+    "scipy>=1.10.0" \
+    "sherpa-onnx>=1.13.7" \
+    "sherpa-onnx-core>=1.13.7" \
+    "onnxruntime<1.24.0"
 
 # Copy application files and static web assets
 COPY app.py download_models.py entrypoint.sh ./
