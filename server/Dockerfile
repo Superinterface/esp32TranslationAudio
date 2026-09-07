@@ -22,15 +22,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Install lean Python dependencies (Only SenseVoice INT8 + VAD stack, NO PyTorch/bloat)
-RUN pip install --no-cache-dir \
-    fastapi>=0.100.0 \
-    uvicorn[standard]>=0.23.0 \
-    websockets>=11.0 \
-    numpy>=1.24.0 \
-    scipy>=1.10.0 \
-    sherpa-onnx>=1.13.7 \
-    sherpa-onnx-core>=1.13.7 \
-    onnxruntime<1.24.0
+COPY requirements-docker.txt .
+RUN pip install --no-cache-dir -r requirements-docker.txt
 
 # Copy application files and static web assets
 COPY app.py download_models.py entrypoint.sh ./
